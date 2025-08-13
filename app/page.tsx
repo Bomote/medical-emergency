@@ -16,10 +16,14 @@ import {
   ChevronUp,
   Save,
   Calculator,
+  Star,
 } from "lucide-react"
 import emergencyConditionsData from "@/data/emergencyConditions.json"
 import DosageCalculator from "@/components/DosageCalculator"
 import ClinicalDecisionSupport from "@/components/ClinicalDecisionSupport"
+import RecentSearches from "@/components/RecentSearches"
+import FavoritesManager from "@/components/FavoritesManager"
+import QuickAccessPanel from "@/components/QuickAccessPanel"
 
 interface Treatment {
   drugName: string
@@ -97,9 +101,16 @@ export default function EmergencyReference() {
   const [notesSaving, setNotesSaving] = useState<Record<number, boolean>>({})
   const [calculatorOpen, setCalculatorOpen] = useState<number | null>(null)
   const [clinicalSupportOpen, setClinicalSupportOpen] = useState<number | null>(null)
+  const [favorites, setFavorites] = useState<Set<number>>(new Set())
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const [showQuickAccess, setShowQuickAccess] = useState(true)
 
   useEffect(() => {
     const savedNotes = localStorage.getItem("emergency-reference-notes")
+    const savedFavorites = localStorage.getItem("emergency-reference-favorites")
+    const savedRecentSearches = localStorage.getItem("emergency-reference-recent-searches")
+
     if (savedNotes) {
       try {
         setNotes(JSON.parse(savedNotes))
@@ -107,11 +118,62 @@ export default function EmergencyReference() {
         console.error("Error loading notes from localStorage:", error)
       }
     }
+
+    if (savedFavorites) {
+      try {
+        setFavorites(new Set(JSON.parse(savedFavorites)))
+      } catch (error) {
+        console.error("Error loading favorites from localStorage:", error)
+      }
+    }
+
+    if (savedRecentSearches) {
+      try {
+        setRecentSearches(JSON.parse(savedRecentSearches))
+      } catch (error) {
+        console.error("Error loading recent searches from localStorage:", error)
+      }
+    }
   }, [])
 
   useEffect(() => {
     localStorage.setItem("emergency-reference-notes", JSON.stringify(notes))
   }, [notes])
+
+  useEffect(() => {
+    localStorage.setItem("emergency-reference-favorites", JSON.stringify(Array.from(favorites)))
+  }, [favorites])
+
+  useEffect(() => {
+    localStorage.setItem("emergency-reference-recent-searches", JSON.stringify(recentSearches))
+  }, [recentSearches])
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term)
+
+    if (term.trim() && term.length > 2) {
+      setRecentSearches((prev) => {
+        const filtered = prev.filter((search) => search !== term.trim())
+        return [term.trim(), ...filtered].slice(0, 10) // Keep last 10 searches
+      })
+    }
+  }
+
+  const toggleFavorite = (conditionId: number) => {
+    setFavorites((prev) => {
+      const newFavorites = new Set(prev)
+      if (newFavorites.has(conditionId)) {
+        newFavorites.delete(conditionId)
+      } else {
+        newFavorites.add(conditionId)
+      }
+      return newFavorites
+    })
+  }
+
+  const clearRecentSearches = () => {
+    setRecentSearches([])
+  }
 
   const handleNoteChange = (conditionId: number, noteText: string) => {
     setNotes((prev) => ({ ...prev, [conditionId]: noteText }))
@@ -159,10 +221,16 @@ export default function EmergencyReference() {
         (notes[condition.id] && notes[condition.id].toLowerCase().includes(searchLower))
 
       const matchesSpecialty = selectedSpecialty === "All" || condition.specialty === selectedSpecialty
+      const matchesFavorites = !showFavoritesOnly || favorites.has(condition.id)
 
-      return matchesSearch && matchesSpecialty
+      return matchesSearch && matchesSpecialty && matchesFavorites
     })
-  }, [searchTerm, selectedSpecialty, notes])
+  }, [searchTerm, selectedSpecialty, notes, showFavoritesOnly, favorites])
+
+  const mostCriticalConditions = useMemo(() => {
+    const criticalIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // Top 10 by order rank
+    return emergencyConditions.filter((condition) => criticalIds.includes(condition.orderRank))
+  }, [])
 
   const specialties = ["All", ...Array.from(new Set(emergencyConditions.map((c) => c.specialty)))]
 
@@ -264,6 +332,10 @@ export default function EmergencyReference() {
                   <StickyNote className="h-4 w-4" />
                   {Object.keys(notes).filter((id) => notes[Number.parseInt(id)]?.trim()).length} notes
                 </div>
+                <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md flex items-center gap-2">
+                  <Star className="h-4 w-4" />
+                  {favorites.size} favorites
+                </div>
               </div>
             </div>
 
@@ -274,8 +346,14 @@ export default function EmergencyReference() {
                   type="text"
                   placeholder="Search conditions, symptoms, treatments, ICD codes, or your notes..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearch(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+                <RecentSearches
+                  searches={recentSearches}
+                  isVisible={searchTerm === ""}
+                  onSearchSelect={setSearchTerm}
+                  onClear={clearRecentSearches}
                 />
               </div>
 
@@ -294,6 +372,11 @@ export default function EmergencyReference() {
                     ))}
                   </select>
                 </div>
+
+                <FavoritesManager
+                  showFavoritesOnly={showFavoritesOnly}
+                  onToggleShowFavoritesOnly={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                />
               </div>
             </div>
           </div>
@@ -301,6 +384,12 @@ export default function EmergencyReference() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <QuickAccessPanel
+          conditions={mostCriticalConditions}
+          isVisible={showQuickAccess && !showFavoritesOnly && !searchTerm}
+          onClose={() => setShowQuickAccess(false)}
+        />
+
         <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
             <h3 className="flex items-center gap-2 font-semibold text-gray-900">
@@ -326,6 +415,7 @@ export default function EmergencyReference() {
           {filteredConditions.map((condition) => (
             <div
               key={condition.id}
+              id={`condition-${condition.id}`}
               className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300"
             >
               <div className={`${specialtyColors[condition.specialty]} px-6 py-4 border-b`}>
@@ -334,6 +424,16 @@ export default function EmergencyReference() {
                     <div className="flex items-start gap-3 mb-2">
                       <h2 className="text-xl font-bold leading-tight">{condition.condition}</h2>
                       <div className="text-2xl">{ageGroupIcons[condition.ageGroup]}</div>
+                      <button
+                        onClick={() => toggleFavorite(condition.id)}
+                        className={`p-1 rounded-full transition-all ${
+                          favorites.has(condition.id)
+                            ? "text-yellow-500 bg-white/30"
+                            : "text-white/60 hover:text-white/80 hover:bg-white/20"
+                        }`}
+                      >
+                        <Star className={`h-5 w-5 ${favorites.has(condition.id) ? "fill-current" : ""}`} />
+                      </button>
                       {notes[condition.id]?.trim() && (
                         <div className="bg-white/30 p-1 rounded-full">
                           <StickyNote className="h-4 w-4" />
@@ -374,7 +474,7 @@ export default function EmergencyReference() {
                       onClick={() => toggleNotes(condition.id)}
                       className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
                     >
-                      <StickyNote className="h-3 w-3" />
+                      <StickyNote className="h-4 w-4" />
                       Notes
                       {expandedNotes[condition.id] ? (
                         <ChevronUp className="h-3 w-3" />
@@ -534,11 +634,19 @@ export default function EmergencyReference() {
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 text-center py-16">
             <div className="max-w-md mx-auto">
               <div className="mb-4">
-                <Search className="h-16 w-16 text-gray-300 mx-auto" />
+                {showFavoritesOnly ? (
+                  <Star className="h-16 w-16 text-gray-300 mx-auto" />
+                ) : (
+                  <Search className="h-16 w-16 text-gray-300 mx-auto" />
+                )}
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No conditions found</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {showFavoritesOnly ? "No favorites found" : "No conditions found"}
+              </h3>
               <p className="text-gray-600">
-                Try adjusting your search terms or filter criteria to find what you&#39;re looking for.
+                {showFavoritesOnly
+                  ? "Start adding conditions to your favorites by clicking the star icon."
+                  : "Try adjusting your search terms or filter criteria to find what you're looking for."}
               </p>
             </div>
           </div>
