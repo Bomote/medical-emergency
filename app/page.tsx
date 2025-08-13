@@ -25,6 +25,7 @@ import FavoritesManager from "@/components/FavoritesManager"
 import SearchAutocomplete from "@/components/SearchAutocomplete"
 import AdvancedSearchFilters from "@/components/AdvancedSearchFilters"
 import RelatedConditions from "@/components/RelatedConditions"
+import DataManager from "@/components/DataManager"
 
 interface Treatment {
   drugName: string
@@ -309,6 +310,16 @@ export default function EmergencyReference() {
         )}
       </div>
     )
+  }
+
+  const handleDataImport = (importedData: {
+    notes: Record<number, string>
+    favorites: number[]
+    recentSearches: string[]
+  }) => {
+    setNotes(importedData.notes)
+    setFavorites(new Set(importedData.favorites))
+    setRecentSearches(importedData.recentSearches)
   }
 
   return (
@@ -670,6 +681,13 @@ export default function EmergencyReference() {
             </div>
           </div>
         )}
+
+        <DataManager
+          notes={notes}
+          favorites={favorites}
+          recentSearches={recentSearches}
+          onImportData={handleDataImport}
+        />
       </div>
     </div>
   )
