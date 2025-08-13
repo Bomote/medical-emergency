@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { Search, Stethoscope, Activity, Clock, StickyNote, Star } from "lucide-react"
 import DosageCalculator from "@/components/DosageCalculator"
 import ClinicalDecisionSupport from "@/components/ClinicalDecisionSupport"
@@ -9,10 +9,8 @@ import FavoritesManager from "@/components/FavoritesManager"
 import SearchAutocomplete from "@/components/SearchAutocomplete"
 import AdvancedSearchFilters from "@/components/AdvancedSearchFilters"
 import DataManager from "@/components/DataManager"
-import VirtualizedConditionList, {
-  getCachedSearchResult,
-  setCachedSearchResult,
-} from "@/components/VirtualizedConditionList"
+import VirtualizedConditionList from "@/components/VirtualizedConditionList"
+import emergencyConditionsData from "@/data/emergencyConditions.json"
 
 interface Treatment {
   drugName: string
@@ -81,9 +79,7 @@ const ageGroupIcons = {
 }
 
 export default function EmergencyReference() {
-  const [emergencyConditions, setEmergencyConditions] = useState<EmergencyCondition[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const emergencyConditions = emergencyConditionsData as EmergencyCondition[]
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSpecialty, setSelectedSpecialty] = useState("All")
   const [selectedAgeGroup, setSelectedAgeGroup] = useState("All")
@@ -98,29 +94,7 @@ export default function EmergencyReference() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [showQuickAccess, setShowQuickAccess] = useState(true)
 
-  useEffect(() => {
-    const fetchEmergencyConditions = async () => {
-      try {
-        setIsLoading(true)
-        const response = await fetch("/emergencyConditions.json")
-        if (!response.ok) {
-          throw new Error(`Failed to fetch emergency conditions: ${response.status}`)
-        }
-        const data = await response.json()
-        setEmergencyConditions(data)
-        setLoadError(null)
-      } catch (error) {
-        console.error("Error fetching emergency conditions:", error)
-        setLoadError(error instanceof Error ? error.message : "Failed to load emergency conditions")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchEmergencyConditions()
-  }, [])
-
-  useEffect(() => {
+  useMemo(() => {
     const savedNotes = localStorage.getItem("emergency-reference-notes")
     const savedFavorites = localStorage.getItem("emergency-reference-favorites")
     const savedRecentSearches = localStorage.getItem("emergency-reference-recent-searches")
@@ -219,9 +193,13 @@ export default function EmergencyReference() {
     const cacheKey = `${searchTerm}-${selectedSpecialty}-${selectedAgeGroup}-${selectedSeverity}-${showFavoritesOnly}-${Array.from(favorites).join(",")}`
 
     // Check cache first
-    const cachedResult = getCachedSearchResult(cacheKey)
+    const cachedResult = localStorage.getItem(`search-cache-${cacheKey}`)
     if (cachedResult) {
-      return cachedResult
+      try {
+        return JSON.parse(cachedResult) as EmergencyCondition[]
+      } catch (error) {
+        console.error("Error parsing cached search result:", error)
+      }
     }
 
     const result = emergencyConditions.filter((condition) => {
@@ -253,10 +231,29 @@ export default function EmergencyReference() {
       return matchesSearch && matchesSpecialty && matchesAgeGroup && matchesSeverity && matchesFavorites
     })
 
-    // Cache the result
-    setCachedSearchResult(cacheKey, result)
+    // Cache the result with size limit
+    try {
+      const cacheKeys = Object.keys(localStorage).filter((key) => key.startsWith("search-cache-"))
+      if (cacheKeys.length >= 50) {
+        // Remove oldest cache entries
+        cacheKeys.slice(0, 10).forEach((key) => localStorage.removeItem(key))
+      }
+      localStorage.setItem(`search-cache-${cacheKey}`, JSON.stringify(result))
+    } catch (error) {
+      console.error("Error caching search result:", error)
+    }
+
     return result
-  }, [searchTerm, selectedSpecialty, selectedAgeGroup, selectedSeverity, notes, showFavoritesOnly, favorites])
+  }, [
+    searchTerm,
+    selectedSpecialty,
+    selectedAgeGroup,
+    selectedSeverity,
+    notes,
+    showFavoritesOnly,
+    favorites,
+    emergencyConditions,
+  ])
 
   const mostCriticalConditions = useMemo(() => {
     const criticalIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // Top 10 by order rank
@@ -330,38 +327,6 @@ export default function EmergencyReference() {
     setNotes(importedData.notes)
     setFavorites(new Set(importedData.favorites))
     setRecentSearches(importedData.recentSearches)
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Emergency Reference</h2>
-          <p className="text-gray-600">Please wait while we load the medical conditions database...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (loadError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="text-red-600 mb-4">
-            <Activity className="h-12 w-12 mx-auto" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Emergency Reference</h2>
-          <p className="text-gray-600 mb-4">{loadError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
   }
 
   return (
