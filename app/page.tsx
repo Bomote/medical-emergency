@@ -1,22 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import {
-  Search,
-  AlertTriangle,
-  Stethoscope,
-  Activity,
-  Book,
-  Globe,
-  Clock,
-  Users,
-  StickyNote,
-  ChevronDown,
-  ChevronUp,
-  Save,
-  Calculator,
-  Star,
-} from "lucide-react"
+import { Search, Stethoscope, Activity, Clock, StickyNote, Star } from "lucide-react"
 import emergencyConditionsData from "@/data/emergencyConditions.json"
 import DosageCalculator from "@/components/DosageCalculator"
 import ClinicalDecisionSupport from "@/components/ClinicalDecisionSupport"
@@ -24,8 +9,11 @@ import QuickAccessPanel from "@/components/QuickAccessPanel"
 import FavoritesManager from "@/components/FavoritesManager"
 import SearchAutocomplete from "@/components/SearchAutocomplete"
 import AdvancedSearchFilters from "@/components/AdvancedSearchFilters"
-import RelatedConditions from "@/components/RelatedConditions"
 import DataManager from "@/components/DataManager"
+import VirtualizedConditionList, {
+  getCachedSearchResult,
+  setCachedSearchResult,
+} from "@/components/VirtualizedConditionList"
 
 interface Treatment {
   drugName: string
@@ -218,7 +206,15 @@ export default function EmergencyReference() {
   }
 
   const filteredConditions = useMemo(() => {
-    return emergencyConditions.filter((condition) => {
+    const cacheKey = `${searchTerm}-${selectedSpecialty}-${selectedAgeGroup}-${selectedSeverity}-${showFavoritesOnly}-${Array.from(favorites).join(",")}`
+
+    // Check cache first
+    const cachedResult = getCachedSearchResult(cacheKey)
+    if (cachedResult) {
+      return cachedResult
+    }
+
+    const result = emergencyConditions.filter((condition) => {
       const searchLower = searchTerm.toLowerCase()
       const matchesSearch =
         !searchTerm ||
@@ -246,6 +242,10 @@ export default function EmergencyReference() {
 
       return matchesSearch && matchesSpecialty && matchesAgeGroup && matchesSeverity && matchesFavorites
     })
+
+    // Cache the result
+    setCachedSearchResult(cacheKey, result)
+    return result
   }, [searchTerm, selectedSpecialty, selectedAgeGroup, selectedSeverity, notes, showFavoritesOnly, favorites])
 
   const mostCriticalConditions = useMemo(() => {
@@ -433,232 +433,18 @@ export default function EmergencyReference() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {filteredConditions.map((condition) => (
-            <div
-              key={condition.id}
-              id={`condition-${condition.id}`}
-              className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300"
-            >
-              <div className={`${specialtyColors[condition.specialty]} px-6 py-4 border-b`}>
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-start gap-3 mb-2">
-                      <h2 className="text-xl font-bold leading-tight">{condition.condition}</h2>
-                      <div className="text-2xl">{ageGroupIcons[condition.ageGroup]}</div>
-                      <button
-                        onClick={() => toggleFavorite(condition.id)}
-                        className={`p-1 rounded-full transition-all ${
-                          favorites.has(condition.id)
-                            ? "text-yellow-500 bg-white/30"
-                            : "text-white/60 hover:text-white/80 hover:bg-white/20"
-                        }`}
-                      >
-                        <Star className={`h-5 w-5 ${favorites.has(condition.id) ? "fill-current" : ""}`} />
-                      </button>
-                      {notes[condition.id]?.trim() && (
-                        <div className="bg-white/30 p-1 rounded-full">
-                          <StickyNote className="h-4 w-4" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {condition.abbrev && (
-                        <span className="bg-white/20 px-2 py-1 rounded-lg text-sm font-medium">{condition.abbrev}</span>
-                      )}
-                      <span className="bg-white/20 px-2 py-1 rounded-lg text-sm font-mono">{condition.icd10Code}</span>
-                      {condition.subSpecialty && (
-                        <span className="bg-white/20 px-2 py-1 rounded-lg text-sm">{condition.subSpecialty}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-medium">#{condition.orderRank}</span>
-                    <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      {condition.ageGroup}
-                    </span>
-                    <button
-                      onClick={() => openCalculator(condition.id)}
-                      className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
-                    >
-                      <Calculator className="h-3 w-3" />
-                      Calculator
-                    </button>
-                    <button
-                      onClick={() => openClinicalSupport(condition.id)}
-                      className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
-                    >
-                      <Activity className="h-3 w-3" />
-                      Clinical Tools
-                    </button>
-                    <button
-                      onClick={() => toggleNotes(condition.id)}
-                      className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
-                    >
-                      <StickyNote className="h-4 w-4" />
-                      Notes
-                      {expandedNotes[condition.id] ? (
-                        <ChevronUp className="h-3 w-3" />
-                      ) : (
-                        <ChevronDown className="h-3 w-3" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {expandedNotes[condition.id] && (
-                <div className="bg-amber-50 border-b border-amber-200 px-6 py-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-amber-900 flex items-center gap-2">
-                      <StickyNote className="h-4 w-4" />
-                      Personal Notes
-                    </h4>
-                    {notesSaving[condition.id] && (
-                      <div className="flex items-center gap-1 text-sm text-green-600">
-                        <Save className="h-3 w-3" />
-                        Saved
-                      </div>
-                    )}
-                  </div>
-                  <textarea
-                    value={notes[condition.id] || ""}
-                    onChange={(e) => handleNoteChange(condition.id, e.target.value)}
-                    placeholder="Add your personal notes, observations, or reminders for this condition..."
-                    className="w-full p-3 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-vertical min-h-[100px]"
-                  />
-                  <p className="text-xs text-amber-700 mt-2">
-                    Notes are automatically saved and stored locally in your browser.
-                  </p>
-                </div>
-              )}
-
-              <div className="p-6">
-                <div className="grid gap-6 xl:grid-cols-2">
-                  <div className="space-y-6">
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                      <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                        <Stethoscope className="h-4 w-4" />
-                        Clinical Presentation
-                      </h4>
-                      <p className="text-blue-800 leading-relaxed">{condition.presentation}</p>
-                    </div>
-
-                    <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                      <h4 className="font-semibold text-green-900 mb-2">Key Investigations</h4>
-                      <p className="text-green-800 leading-relaxed">{condition.investigations}</p>
-                    </div>
-
-                    <div className="bg-red-50 rounded-xl p-4 border border-red-200">
-                      <h4 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        RED FLAGS - Immediate Action Required
-                      </h4>
-                      <div className="space-y-2">
-                        {condition.redFlags.map((flag, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
-                            <span className="text-red-800 leading-relaxed">{flag}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-3">Differential Diagnoses</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {condition.differentials.map((diff, index) => (
-                          <span
-                            key={index}
-                            className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm border border-gray-200 hover:bg-gray-200 transition-colors"
-                          >
-                            {diff}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {condition.procedure && (
-                      <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                        <h4 className="font-semibold text-purple-900 mb-2">Key Procedures</h4>
-                        <p className="text-purple-800 leading-relaxed">{condition.procedure}</p>
-                      </div>
-                    )}
-
-                    <RelatedConditions
-                      currentCondition={condition}
-                      allConditions={emergencyConditions}
-                      onConditionSelect={(id) => {
-                        // Optional: Add any additional logic when a related condition is selected
-                      }}
-                    />
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-                      <h4 className="font-bold text-gray-900 mb-4 text-lg flex items-center gap-2">
-                        👨‍⚕️ Adult Treatment
-                      </h4>
-                      {formatTreatment(condition.adultTreatment)}
-                    </div>
-
-                    {condition.pedsTreatment && (
-                      <div className="bg-yellow-50 rounded-xl p-5 border border-yellow-200">
-                        <h4 className="font-bold text-yellow-900 mb-4 text-lg flex items-center gap-2">
-                          👶 Pediatric Treatment
-                        </h4>
-                        <div className="text-yellow-800">{formatTreatment(condition.pedsTreatment, true)}</div>
-                      </div>
-                    )}
-
-                    <div className="space-y-4">
-                      {condition.references && condition.references.length > 0 && (
-                        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-200">
-                          <h4 className="font-semibold text-indigo-900 mb-2 flex items-center gap-2">
-                            <Book className="h-4 w-4" />
-                            References
-                          </h4>
-                          {condition.references.map((ref, index) => (
-                            <p key={index} className="text-indigo-800 text-sm">
-                              {ref.textbook} {ref.edition} ed, Ch. {ref.chapter}, p. {ref.pages}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-
-                      {condition.whoGuideline && (
-                        <div className="bg-teal-50 rounded-xl p-4 border border-teal-200">
-                          <h4 className="font-semibold text-teal-900 mb-2 flex items-center gap-2">
-                            <Globe className="h-4 w-4" />
-                            WHO Guideline
-                          </h4>
-                          <p className="text-teal-800 text-sm">{condition.whoGuideline}</p>
-                        </div>
-                      )}
-
-                      {condition.keywords.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold text-gray-700 mb-2">Keywords</h4>
-                          <div className="flex flex-wrap gap-1">
-                            {condition.keywords.map((keyword, index) => (
-                              <span
-                                key={index}
-                                className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs border border-blue-200"
-                              >
-                                {keyword}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <VirtualizedConditionList
+          conditions={filteredConditions}
+          notes={notes}
+          expandedNotes={expandedNotes}
+          notesSaving={notesSaving}
+          favorites={favorites}
+          onNoteChange={handleNoteChange}
+          onToggleNotes={toggleNotes}
+          onToggleFavorite={toggleFavorite}
+          onOpenCalculator={openCalculator}
+          onOpenClinicalSupport={openClinicalSupport}
+        />
 
         {filteredConditions.length === 0 && (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 text-center py-16">
