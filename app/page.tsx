@@ -8,7 +8,6 @@ import {
   Activity,
   Book,
   Globe,
-  Filter,
   Clock,
   Users,
   StickyNote,
@@ -21,9 +20,11 @@ import {
 import emergencyConditionsData from "@/data/emergencyConditions.json"
 import DosageCalculator from "@/components/DosageCalculator"
 import ClinicalDecisionSupport from "@/components/ClinicalDecisionSupport"
-import RecentSearches from "@/components/RecentSearches"
-import FavoritesManager from "@/components/FavoritesManager"
 import QuickAccessPanel from "@/components/QuickAccessPanel"
+import FavoritesManager from "@/components/FavoritesManager"
+import SearchAutocomplete from "@/components/SearchAutocomplete"
+import AdvancedSearchFilters from "@/components/AdvancedSearchFilters"
+import RelatedConditions from "@/components/RelatedConditions"
 
 interface Treatment {
   drugName: string
@@ -96,6 +97,8 @@ const ageGroupIcons = {
 export default function EmergencyReference() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSpecialty, setSelectedSpecialty] = useState("All")
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState("All")
+  const [selectedSeverity, setSelectedSeverity] = useState("All")
   const [notes, setNotes] = useState<Record<number, string>>({})
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({})
   const [notesSaving, setNotesSaving] = useState<Record<number, boolean>>({})
@@ -205,6 +208,14 @@ export default function EmergencyReference() {
     setClinicalSupportOpen(null)
   }
 
+  const clearAllFilters = () => {
+    setSelectedSpecialty("All")
+    setSelectedAgeGroup("All")
+    setSelectedSeverity("All")
+    setShowFavoritesOnly(false)
+    setSearchTerm("")
+  }
+
   const filteredConditions = useMemo(() => {
     return emergencyConditions.filter((condition) => {
       const searchLower = searchTerm.toLowerCase()
@@ -221,11 +232,20 @@ export default function EmergencyReference() {
         (notes[condition.id] && notes[condition.id].toLowerCase().includes(searchLower))
 
       const matchesSpecialty = selectedSpecialty === "All" || condition.specialty === selectedSpecialty
+      const matchesAgeGroup = selectedAgeGroup === "All" || condition.ageGroup === selectedAgeGroup
+
+      const matchesSeverity =
+        selectedSeverity === "All" ||
+        (selectedSeverity === "Critical" && condition.orderRank <= 5) ||
+        (selectedSeverity === "High" && condition.orderRank <= 15) ||
+        (selectedSeverity === "Moderate" && condition.orderRank <= 50) ||
+        (selectedSeverity === "Low" && condition.orderRank > 50)
+
       const matchesFavorites = !showFavoritesOnly || favorites.has(condition.id)
 
-      return matchesSearch && matchesSpecialty && matchesFavorites
+      return matchesSearch && matchesSpecialty && matchesAgeGroup && matchesSeverity && matchesFavorites
     })
-  }, [searchTerm, selectedSpecialty, notes, showFavoritesOnly, favorites])
+  }, [searchTerm, selectedSpecialty, selectedAgeGroup, selectedSeverity, notes, showFavoritesOnly, favorites])
 
   const mostCriticalConditions = useMemo(() => {
     const criticalIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // Top 10 by order rank
@@ -339,45 +359,36 @@ export default function EmergencyReference() {
               </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search conditions, symptoms, treatments, ICD codes, or your notes..."
-                  value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                />
-                <RecentSearches
-                  searches={recentSearches}
-                  isVisible={searchTerm === ""}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <SearchAutocomplete
+                  searchTerm={searchTerm}
+                  onSearchChange={handleSearch}
+                  conditions={emergencyConditions}
+                  recentSearches={recentSearches}
                   onSearchSelect={setSearchTerm}
-                  onClear={clearRecentSearches}
                 />
-              </div>
 
-              <div className="flex gap-3">
-                <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <select
-                    value={selectedSpecialty}
-                    onChange={(e) => setSelectedSpecialty(e.target.value)}
-                    className="pl-10 pr-8 py-3 border border-gray-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none min-w-48"
-                  >
-                    {specialties.map((specialty) => (
-                      <option key={specialty} value={specialty}>
-                        {specialty === "All" ? "All Specialties" : specialty}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex gap-3">
+                  <FavoritesManager
+                    showFavoritesOnly={showFavoritesOnly}
+                    onToggleShowFavoritesOnly={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                  />
                 </div>
-
-                <FavoritesManager
-                  showFavoritesOnly={showFavoritesOnly}
-                  onToggleShowFavoritesOnly={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                />
               </div>
+
+              <AdvancedSearchFilters
+                selectedSpecialty={selectedSpecialty}
+                onSpecialtyChange={setSelectedSpecialty}
+                selectedAgeGroup={selectedAgeGroup}
+                onAgeGroupChange={setSelectedAgeGroup}
+                selectedSeverity={selectedSeverity}
+                onSeverityChange={setSelectedSeverity}
+                showFavoritesOnly={showFavoritesOnly}
+                onToggleFavoritesOnly={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                specialties={specialties}
+                onClearFilters={clearAllFilters}
+              />
             </div>
           </div>
         </div>
@@ -563,6 +574,14 @@ export default function EmergencyReference() {
                         <p className="text-purple-800 leading-relaxed">{condition.procedure}</p>
                       </div>
                     )}
+
+                    <RelatedConditions
+                      currentCondition={condition}
+                      allConditions={emergencyConditions}
+                      onConditionSelect={(id) => {
+                        // Optional: Add any additional logic when a related condition is selected
+                      }}
+                    />
                   </div>
 
                   <div className="space-y-6">
