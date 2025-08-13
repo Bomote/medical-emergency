@@ -1,103 +1,498 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import { useState, useMemo, useEffect } from "react"
+import {
+  Search,
+  AlertTriangle,
+  Stethoscope,
+  Activity,
+  Book,
+  Globe,
+  Filter,
+  Clock,
+  Users,
+  StickyNote,
+  ChevronDown,
+  ChevronUp,
+  Save,
+} from "lucide-react"
+import emergencyConditionsData from "@/data/emergencyConditions.json"
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+interface Treatment {
+  drugName: string
+  drugClass: string
+  dose?: string
+  doseMgPerKg?: string
+  maxDose?: string | null
+  route: string
+  frequency: string
+  duration: string | null
+  notes: string
+}
+
+interface Reference {
+  textbook: string
+  edition: string
+  chapter: string
+  pages: string
+}
+
+interface EmergencyCondition {
+  id: number
+  orderRank: number
+  condition: string
+  icd10Code: string
+  abbrev: string
+  specialty:
+    | "Internal Medicine"
+    | "Surgery"
+    | "Pediatrics"
+    | "Obstetrics"
+    | "Gynecology"
+    | "Emergency"
+    | "Critical Care"
+    | "Neurology"
+  subSpecialty: string | null
+  ageGroup: "Adult" | "Pediatric" | "Both"
+  presentation: string
+  investigations: string
+  redFlags: string[]
+  differentials: string[]
+  adultTreatment: Treatment
+  pedsTreatment: Treatment | null
+  procedure: string | null
+  references: Reference[] | null
+  whoGuideline: string | null
+  lastUpdated: string
+  keywords: string[]
+}
+
+const emergencyConditions: EmergencyCondition[] = emergencyConditionsData as EmergencyCondition[]
+
+const specialtyColors = {
+  "Internal Medicine": "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-900 border-blue-200",
+  Surgery: "bg-gradient-to-r from-green-50 to-green-100 text-green-900 border-green-200",
+  Pediatrics: "bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-900 border-yellow-200",
+  Obstetrics: "bg-gradient-to-r from-pink-50 to-pink-100 text-pink-900 border-pink-200",
+  Gynecology: "bg-gradient-to-r from-purple-50 to-purple-100 text-purple-900 border-purple-200",
+  Emergency: "bg-gradient-to-r from-red-50 to-red-100 text-red-900 border-red-200",
+  "Critical Care": "bg-gradient-to-r from-orange-50 to-orange-100 text-orange-900 border-orange-200",
+  Neurology: "bg-gradient-to-r from-indigo-50 to-indigo-100 text-indigo-900 border-indigo-200",
+}
+
+const ageGroupIcons = {
+  Adult: "👨‍⚕️",
+  Pediatric: "👶",
+  Both: "👥",
+}
+
+export default function EmergencyReference() {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedSpecialty, setSelectedSpecialty] = useState("All")
+  const [notes, setNotes] = useState<Record<number, string>>({})
+  const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({})
+  const [notesSaving, setNotesSaving] = useState<Record<number, boolean>>({})
+
+  useEffect(() => {
+    const savedNotes = localStorage.getItem("emergency-reference-notes")
+    if (savedNotes) {
+      try {
+        setNotes(JSON.parse(savedNotes))
+      } catch (error) {
+        console.error("Error loading notes from localStorage:", error)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem("emergency-reference-notes", JSON.stringify(notes))
+  }, [notes])
+
+  const handleNoteChange = (conditionId: number, noteText: string) => {
+    setNotes((prev) => ({ ...prev, [conditionId]: noteText }))
+
+    setNotesSaving((prev) => ({ ...prev, [conditionId]: true }))
+
+    setTimeout(() => {
+      setNotesSaving((prev) => ({ ...prev, [conditionId]: false }))
+    }, 1000)
+  }
+
+  const toggleNotes = (conditionId: number) => {
+    setExpandedNotes((prev) => ({ ...prev, [conditionId]: !prev[conditionId] }))
+  }
+
+  const filteredConditions = useMemo(() => {
+    return emergencyConditions.filter((condition) => {
+      const searchLower = searchTerm.toLowerCase()
+      const matchesSearch =
+        !searchTerm ||
+        condition.condition.toLowerCase().includes(searchLower) ||
+        condition.presentation.toLowerCase().includes(searchLower) ||
+        condition.differentials.some((diff) => diff.toLowerCase().includes(searchLower)) ||
+        condition.keywords.some((keyword) => keyword.toLowerCase().includes(searchLower)) ||
+        condition.adultTreatment?.drugName?.toLowerCase().includes(searchLower) ||
+        condition.pedsTreatment?.drugName?.toLowerCase().includes(searchLower) ||
+        condition.icd10Code.toLowerCase().includes(searchLower) ||
+        condition.abbrev?.toLowerCase().includes(searchLower) ||
+        (notes[condition.id] && notes[condition.id].toLowerCase().includes(searchLower))
+
+      const matchesSpecialty = selectedSpecialty === "All" || condition.specialty === selectedSpecialty
+
+      return matchesSearch && matchesSpecialty
+    })
+  }, [searchTerm, selectedSpecialty, notes])
+
+  const specialties = ["All", ...Array.from(new Set(emergencyConditions.map((c) => c.specialty)))]
+
+  const formatTreatment = (treatment: Treatment, isPediatric = false) => {
+    if (!treatment) return <div className="text-gray-500 italic">No treatment data available</div>
+
+    const dose = isPediatric && treatment.doseMgPerKg ? treatment.doseMgPerKg : treatment.dose
+    const maxDoseText = isPediatric && treatment.maxDose ? ` (max ${treatment.maxDose})` : ""
+
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="font-semibold text-lg">
+            <span className="text-blue-700">{treatment.drugName || "Not specified"}</span>
+          </div>
+          {treatment.drugClass && (
+            <span className="text-sm bg-gray-100 px-2 py-1 rounded-full text-gray-600">{treatment.drugClass}</span>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {dose && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-gray-600 min-w-0">Dose:</span>
+            <span className="bg-blue-50 px-2 py-1 rounded text-blue-800 font-mono">
+              {dose}
+              {maxDoseText}
+            </span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+          {treatment.route && (
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-gray-600">Route:</span>
+              <span className="bg-green-50 px-2 py-1 rounded text-green-800">{treatment.route}</span>
+            </div>
+          )}
+          {treatment.frequency && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3 text-gray-400" />
+              <span className="bg-purple-50 px-2 py-1 rounded text-purple-800">{treatment.frequency}</span>
+            </div>
+          )}
+          {treatment.duration && (
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-gray-600">Duration:</span>
+              <span className="bg-orange-50 px-2 py-1 rounded text-orange-800">{treatment.duration}</span>
+            </div>
+          )}
+        </div>
+
+        {treatment.notes && (
+          <div className="bg-amber-50 border-l-4 border-amber-400 p-3 rounded-r">
+            <p className="text-sm text-amber-800 italic">{treatment.notes}</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <Activity className="h-8 w-8 text-red-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Emergency Medicine Reference</h1>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Comprehensive clinical decision support with personal notes
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md">
+                  {filteredConditions.length} conditions
+                </div>
+                <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md flex items-center gap-2">
+                  <StickyNote className="h-4 w-4" />
+                  {Object.keys(notes).filter((id) => notes[Number.parseInt(id)]?.trim()).length} notes
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search conditions, symptoms, treatments, ICD codes, or your notes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="relative">
+                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <select
+                    value={selectedSpecialty}
+                    onChange={(e) => setSelectedSpecialty(e.target.value)}
+                    className="pl-10 pr-8 py-3 border border-gray-300 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none min-w-48"
+                  >
+                    {specialties.map((specialty) => (
+                      <option key={specialty} value={specialty}>
+                        {specialty === "All" ? "All Specialties" : specialty}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+            <h3 className="flex items-center gap-2 font-semibold text-gray-900">
+              <Stethoscope className="h-5 w-5 text-blue-600" />
+              Specialty Color Legend
+            </h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {Object.entries(specialtyColors).map(([specialty, colorClass]) => (
+                <div
+                  key={specialty}
+                  className={`${colorClass} px-4 py-3 rounded-xl border font-medium text-center transition-transform hover:scale-105`}
+                >
+                  {specialty}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {filteredConditions.map((condition) => (
+            <div
+              key={condition.id}
+              className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300"
+            >
+              <div className={`${specialtyColors[condition.specialty]} px-6 py-4 border-b`}>
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-3 mb-2">
+                      <h2 className="text-xl font-bold leading-tight">{condition.condition}</h2>
+                      <div className="text-2xl">{ageGroupIcons[condition.ageGroup]}</div>
+                      {notes[condition.id]?.trim() && (
+                        <div className="bg-white/30 p-1 rounded-full">
+                          <StickyNote className="h-4 w-4" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {condition.abbrev && (
+                        <span className="bg-white/20 px-2 py-1 rounded-lg text-sm font-medium">{condition.abbrev}</span>
+                      )}
+                      <span className="bg-white/20 px-2 py-1 rounded-lg text-sm font-mono">{condition.icd10Code}</span>
+                      {condition.subSpecialty && (
+                        <span className="bg-white/20 px-2 py-1 rounded-lg text-sm">{condition.subSpecialty}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-medium">#{condition.orderRank}</span>
+                    <span className="bg-white/20 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {condition.ageGroup}
+                    </span>
+                    <button
+                      onClick={() => toggleNotes(condition.id)}
+                      className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <StickyNote className="h-3 w-3" />
+                      Notes
+                      {expandedNotes[condition.id] ? (
+                        <ChevronUp className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {expandedNotes[condition.id] && (
+                <div className="bg-amber-50 border-b border-amber-200 px-6 py-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-amber-900 flex items-center gap-2">
+                      <StickyNote className="h-4 w-4" />
+                      Personal Notes
+                    </h4>
+                    {notesSaving[condition.id] && (
+                      <div className="flex items-center gap-1 text-sm text-green-600">
+                        <Save className="h-3 w-3" />
+                        Saved
+                      </div>
+                    )}
+                  </div>
+                  <textarea
+                    value={notes[condition.id] || ""}
+                    onChange={(e) => handleNoteChange(condition.id, e.target.value)}
+                    placeholder="Add your personal notes, observations, or reminders for this condition..."
+                    className="w-full p-3 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-vertical min-h-[100px]"
+                  />
+                  <p className="text-xs text-amber-700 mt-2">
+                    Notes are automatically saved and stored locally in your browser.
+                  </p>
+                </div>
+              )}
+
+              <div className="p-6">
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="space-y-6">
+                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                      <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                        <Stethoscope className="h-4 w-4" />
+                        Clinical Presentation
+                      </h4>
+                      <p className="text-blue-800 leading-relaxed">{condition.presentation}</p>
+                    </div>
+
+                    <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                      <h4 className="font-semibold text-green-900 mb-2">Key Investigations</h4>
+                      <p className="text-green-800 leading-relaxed">{condition.investigations}</p>
+                    </div>
+
+                    <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                      <h4 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        RED FLAGS - Immediate Action Required
+                      </h4>
+                      <div className="space-y-2">
+                        {condition.redFlags.map((flag, index) => (
+                          <div key={index} className="flex items-start gap-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <span className="text-red-800 leading-relaxed">{flag}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">Differential Diagnoses</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {condition.differentials.map((diff, index) => (
+                          <span
+                            key={index}
+                            className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm border border-gray-200 hover:bg-gray-200 transition-colors"
+                          >
+                            {diff}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {condition.procedure && (
+                      <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                        <h4 className="font-semibold text-purple-900 mb-2">Key Procedures</h4>
+                        <p className="text-purple-800 leading-relaxed">{condition.procedure}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                      <h4 className="font-bold text-gray-900 mb-4 text-lg flex items-center gap-2">
+                        👨‍⚕️ Adult Treatment
+                      </h4>
+                      {formatTreatment(condition.adultTreatment)}
+                    </div>
+
+                    {condition.pedsTreatment && (
+                      <div className="bg-yellow-50 rounded-xl p-5 border border-yellow-200">
+                        <h4 className="font-bold text-yellow-900 mb-4 text-lg flex items-center gap-2">
+                          👶 Pediatric Treatment
+                        </h4>
+                        <div className="text-yellow-800">{formatTreatment(condition.pedsTreatment, true)}</div>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      {condition.references && condition.references.length > 0 && (
+                        <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-200">
+                          <h4 className="font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                            <Book className="h-4 w-4" />
+                            References
+                          </h4>
+                          {condition.references.map((ref, index) => (
+                            <p key={index} className="text-indigo-800 text-sm">
+                              {ref.textbook} {ref.edition} ed, Ch. {ref.chapter}, p. {ref.pages}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      {condition.whoGuideline && (
+                        <div className="bg-teal-50 rounded-xl p-4 border border-teal-200">
+                          <h4 className="font-semibold text-teal-900 mb-2 flex items-center gap-2">
+                            <Globe className="h-4 w-4" />
+                            WHO Guideline
+                          </h4>
+                          <p className="text-teal-800 text-sm">{condition.whoGuideline}</p>
+                        </div>
+                      )}
+
+                      {condition.keywords.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold text-gray-700 mb-2">Keywords</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {condition.keywords.map((keyword, index) => (
+                              <span
+                                key={index}
+                                className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs border border-blue-200"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filteredConditions.length === 0 && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 text-center py-16">
+            <div className="max-w-md mx-auto">
+              <div className="mb-4">
+                <Search className="h-16 w-16 text-gray-300 mx-auto" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No conditions found</h3>
+              <p className="text-gray-600">
+                Try adjusting your search terms or filter criteria to find what you&#39;re looking for.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  );
+  )
 }
