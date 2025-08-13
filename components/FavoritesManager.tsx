@@ -7,7 +7,6 @@ interface FavoritesManagerProps {
   onToggleShowFavoritesOnly: () => void
 }
 
-
 export default function FavoritesManager({ showFavoritesOnly, onToggleShowFavoritesOnly }: FavoritesManagerProps) {
   return (
     <button

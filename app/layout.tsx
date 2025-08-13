@@ -41,6 +41,15 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#dc2626" },
+    { media: "(prefers-color-scheme: dark)", color: "#dc2626" },
+  ],
   openGraph: {
     title: "Emergency Medicine Reference",
     description: "Comprehensive emergency medicine reference with clinical decision support tools",
@@ -54,15 +63,6 @@ export const metadata: Metadata = {
     title: "Emergency Medicine Reference",
     description: "Comprehensive emergency medicine reference with clinical decision support tools",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#dc2626" },
-    { media: "(prefers-color-scheme: dark)", color: "#dc2626" },
-  ],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

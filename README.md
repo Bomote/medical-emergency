@@ -1,6 +1,6 @@
 # Emergency Medicine Reference
 
-A comprehensive digital emergency medicine reference tool designed for healthcare professionals. This web application provides quick access to critical clinical information for emergency conditions, with searchable content, specialty filtering, and personal note-taking capabilities.
+A comprehensive digital emergency medicine reference tool designed for healthcare professionals. This web application provides quick access to critical clinical information for emergency conditions, with advanced clinical decision support tools, dosage calculators, and offline capabilities.
 
 ## Features
 
@@ -10,21 +10,46 @@ A comprehensive digital emergency medicine reference tool designed for healthcar
 - **ICD-10 Codes**: International classification codes for each condition
 - **Age Group Support**: Adult, pediatric, and combined protocols
 
+### 🧮 Dosage Calculator & Clinical Tools
+- **Weight-Based Calculations**: Convert mg/kg doses to actual doses based on patient weight
+- **BMI & BSA Calculators**: Body Mass Index and Body Surface Area calculations
+- **Unit Conversions**: Convert mg to mL based on drug concentrations
+- **Clinical Decision Support**: Built-in scoring systems (CURB-65, qSOFA, GCS, Wells Score, NIHSS)
+- **Risk Stratification**: Evidence-based risk assessment tools
+- **Drug Allergy Warnings**: Alternative medication suggestions for common allergies
+
+### ⭐ Quick Access & Favorites
+- **Bookmark System**: Save frequently used conditions with localStorage persistence
+- **Recent Searches**: Track and quickly access your last 10 searches
+- **Most Critical Panel**: Quick access to the top 10 life-threatening conditions
+- **Smart Navigation**: Direct scroll-to functionality for rapid access
+
 ### 🔍 Advanced Search & Filtering
 - **Multi-field Search**: Search across conditions, symptoms, treatments, ICD codes, and personal notes
 - **Specialty Filtering**: Filter by medical specialty (Internal Medicine, Surgery, Pediatrics, etc.)
-- **Real-time Results**: Instant filtering as you type
+- **Severity Level Filtering**: Filter by condition priority and urgency
+- **Age Group Filtering**: Filter by adult, pediatric, or combined protocols
+- **Search Autocomplete**: Intelligent suggestions with medical terminology
+- **Related Conditions**: Discover related conditions based on specialty and keywords
 
-### 📝 Personal Note-Taking
+### 📝 Personal Note-Taking & Data Management
 - **Condition-Specific Notes**: Add personal observations and reminders for each condition
 - **Auto-Save**: Notes are automatically saved to local storage
 - **Searchable Notes**: Your notes are included in search results
-- **Visual Indicators**: See which conditions have notes at a glance
+- **Export/Import**: Backup and restore notes, favorites, and search history
+- **Print-Friendly**: Optimized layouts for offline reference cards
 
-### 📱 Responsive Design
+### 📱 Offline & PWA Capabilities
+- **Progressive Web App**: Install on mobile devices and desktops
+- **Service Worker**: Cache critical medical data for offline access
+- **Offline Indicator**: Visual feedback for connection status
 - **Mobile Optimized**: Works seamlessly on smartphones, tablets, and desktops
-- **Touch Friendly**: Optimized for touch interactions
-- **Offline Capable**: Core functionality works without internet connection
+
+### ⚡ Performance Optimization
+- **Virtual Scrolling**: Efficient rendering of large datasets
+- **Lazy Loading**: Load condition details only when needed
+- **Search Result Caching**: Avoid re-filtering on repeated searches
+- **Memoized Components**: Optimized rendering performance
 
 ## Getting Started
 
@@ -70,13 +95,27 @@ npm start
 emergency-reference/
 ├── app/
 │   ├── page.tsx              # Main application component
-│   ├── layout.tsx            # Root layout with fonts and providers
+│   ├── layout.tsx            # Root layout with PWA configuration
 │   ├── globals.css           # Global styles and Tailwind configuration
 │   └── loading.tsx           # Loading component
-├── data/
-│   └── emergencyConditions.json  # Medical conditions database
 ├── components/
+│   ├── DosageCalculator.tsx  # Weight-based dosage calculations
+│   ├── ClinicalDecisionSupport.tsx # Clinical scoring systems
+│   ├── QuickAccessPanel.tsx  # Critical conditions quick access
+│   ├── RecentSearches.tsx    # Search history management
+│   ├── FavoritesManager.tsx  # Bookmarking functionality
+│   ├── AdvancedSearchFilters.tsx # Advanced filtering options
+│   ├── SearchAutocomplete.tsx # Intelligent search suggestions
+│   ├── RelatedConditions.tsx # Related condition recommendations
+│   ├── DataManager.tsx       # Export/import functionality
+│   ├── VirtualizedConditionList.tsx # Performance-optimized list
+│   ├── OfflineIndicator.tsx  # Connection status indicator
 │   └── ui/                   # Reusable UI components (shadcn/ui)
+├── public/
+│   ├── emergencyConditions.json # Medical conditions database
+│   ├── manifest.json         # PWA manifest
+│   ├── sw.js                 # Service worker for offline functionality
+│   └── *.png                 # App icons and assets
 ├── lib/
 │   └── utils.ts              # Utility functions
 └── README.md
@@ -124,45 +163,35 @@ interface Treatment {
 
 ## Usage Guide
 
-### Basic Navigation
-1. **Search**: Use the search bar to find conditions by name, symptoms, treatments, or ICD codes
-2. **Filter**: Select a medical specialty to narrow results
-3. **Browse**: Scroll through conditions organized by clinical priority
+### Clinical Decision Support Tools
+1. **Access Tools**: Click the "Clinical Tools" button on any condition card
+2. **Scoring Systems**: Use built-in calculators for CURB-65, qSOFA, GCS, and other clinical scores
+3. **Risk Assessment**: Get evidence-based risk stratification and recommendations
+4. **Drug Allergies**: Check for contraindications and alternative medications
 
-### Adding Notes
-1. Click the "Notes" button on any condition card
-2. Type your personal observations or reminders
-3. Notes are automatically saved and remain available across sessions
-4. Search your notes using the main search bar
+### Dosage Calculator
+1. **Open Calculator**: Click the "Calculator" button on any condition card
+2. **Enter Patient Data**: Input weight, height, and age for accurate calculations
+3. **Drug Concentrations**: Specify medication concentrations for volume calculations
+4. **Get Results**: View calculated doses, BMI, BSA, and administration volumes
 
-### Clinical Information Layout
-Each condition displays:
-- **Header**: Condition name, ICD-10 code, specialty, age group
-- **Clinical Presentation**: Signs and symptoms
-- **Investigations**: Recommended diagnostic tests
-- **Red Flags**: Critical warning signs (highlighted in red)
-- **Differentials**: Alternative diagnoses to consider
-- **Treatment Protocols**: Separate adult and pediatric sections
-- **References**: Medical textbook citations
-- **WHO Guidelines**: International treatment standards
+### Quick Access & Favorites
+1. **Bookmark Conditions**: Click the star icon to add conditions to favorites
+2. **Access Recent Searches**: Use the dropdown to revisit previous searches
+3. **Critical Conditions**: Use the "Most Critical" panel for life-threatening emergencies
+4. **Smart Navigation**: Click condition names for direct scroll-to functionality
 
-## Customization
+### Advanced Search & Filtering
+1. **Search Autocomplete**: Start typing for intelligent medical term suggestions
+2. **Multiple Filters**: Combine specialty, severity, and age group filters
+3. **Related Conditions**: Discover related conditions in the sidebar
+4. **Search History**: Access your recent searches for quick reference
 
-### Adding New Conditions
-1. Edit `data/emergencyConditions.json`
-2. Follow the existing data structure
-3. Ensure all required fields are included
-4. Update the `orderRank` to maintain priority ordering
-
-### Modifying Specialties
-1. Update the `specialtyColors` object in `app/page.tsx`
-2. Add new color schemes following the existing pattern
-3. Ensure accessibility compliance (WCAG AA contrast ratios)
-
-### Styling Changes
-- Global styles: `app/globals.css`
-- Component styles: Tailwind classes in `app/page.tsx`
-- Color scheme: Modify the `specialtyColors` object
+### Data Management
+1. **Export Data**: Use the Data Manager to backup notes, favorites, and search history
+2. **Import Data**: Restore previously exported data across devices
+3. **Print Reference**: Generate print-friendly condition cards for offline use
+4. **Data Statistics**: View usage statistics and data insights
 
 ## Technical Details
 
@@ -170,20 +199,27 @@ Each condition displays:
 - **Next.js 14**: React framework with App Router
 - **TypeScript**: Type-safe development
 - **Tailwind CSS**: Utility-first styling
+- **React Window**: Virtual scrolling for performance
 - **Lucide React**: Icon library
 - **shadcn/ui**: Component library
+
+### PWA Features
+- **Service Worker**: Offline functionality and caching
+- **Web App Manifest**: Native app-like experience
+- **Installable**: Add to home screen on mobile devices
+- **Offline Indicator**: Real-time connection status
+
+### Performance Optimizations
+- **Virtual Scrolling**: Handle large datasets efficiently
+- **Lazy Loading**: Load content on demand
+- **Memoization**: Prevent unnecessary re-renders
+- **Search Caching**: Cache search results for faster access
 
 ### Browser Support
 - Chrome 90+
 - Firefox 88+
 - Safari 14+
 - Edge 90+
-
-### Performance Features
-- **Client-side Rendering**: Fast interactions and filtering
-- **Optimized Search**: Efficient filtering algorithms
-- **Local Storage**: Persistent notes without server dependency
-- **Responsive Images**: Optimized for all screen sizes
 
 ## Contributing
 
@@ -206,6 +242,7 @@ Each condition displays:
 - Follow TypeScript best practices
 - Use Tailwind CSS for styling
 - Maintain responsive design principles
+- Create modular components for easier maintenance
 - Include proper error handling
 - Write descriptive commit messages
 

@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { Search, Stethoscope, Activity, Clock, StickyNote, Star } from "lucide-react"
-import emergencyConditionsData from "@/data/emergencyConditions.json"
 import DosageCalculator from "@/components/DosageCalculator"
 import ClinicalDecisionSupport from "@/components/ClinicalDecisionSupport"
 import QuickAccessPanel from "@/components/QuickAccessPanel"
@@ -64,8 +63,6 @@ interface EmergencyCondition {
   keywords: string[]
 }
 
-const emergencyConditions: EmergencyCondition[] = emergencyConditionsData as EmergencyCondition[]
-
 const specialtyColors = {
   "Internal Medicine": "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-900 border-blue-200",
   Surgery: "bg-gradient-to-r from-green-50 to-green-100 text-green-900 border-green-200",
@@ -84,6 +81,9 @@ const ageGroupIcons = {
 }
 
 export default function EmergencyReference() {
+  const [emergencyConditions, setEmergencyConditions] = useState<EmergencyCondition[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSpecialty, setSelectedSpecialty] = useState("All")
   const [selectedAgeGroup, setSelectedAgeGroup] = useState("All")
@@ -97,6 +97,28 @@ export default function EmergencyReference() {
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [showQuickAccess, setShowQuickAccess] = useState(true)
+
+  useEffect(() => {
+    const fetchEmergencyConditions = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch("/emergencyConditions.json")
+        if (!response.ok) {
+          throw new Error(`Failed to fetch emergency conditions: ${response.status}`)
+        }
+        const data = await response.json()
+        setEmergencyConditions(data)
+        setLoadError(null)
+      } catch (error) {
+        console.error("Error fetching emergency conditions:", error)
+        setLoadError(error instanceof Error ? error.message : "Failed to load emergency conditions")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchEmergencyConditions()
+  }, [])
 
   useEffect(() => {
     const savedNotes = localStorage.getItem("emergency-reference-notes")
@@ -127,18 +149,6 @@ export default function EmergencyReference() {
       }
     }
   }, [])
-
-  useEffect(() => {
-    localStorage.setItem("emergency-reference-notes", JSON.stringify(notes))
-  }, [notes])
-
-  useEffect(() => {
-    localStorage.setItem("emergency-reference-favorites", JSON.stringify(Array.from(favorites)))
-  }, [favorites])
-
-  useEffect(() => {
-    localStorage.setItem("emergency-reference-recent-searches", JSON.stringify(recentSearches))
-  }, [recentSearches])
 
   const handleSearch = (term: string) => {
     setSearchTerm(term)
@@ -322,6 +332,38 @@ export default function EmergencyReference() {
     setRecentSearches(importedData.recentSearches)
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Emergency Reference</h2>
+          <p className="text-gray-600">Please wait while we load the medical conditions database...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="text-red-600 mb-4">
+            <Activity className="h-12 w-12 mx-auto" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to Load Emergency Reference</h2>
+          <p className="text-gray-600 mb-4">{loadError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
       {calculatorOpen && (
@@ -405,19 +447,19 @@ export default function EmergencyReference() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <QuickAccessPanel
           conditions={mostCriticalConditions}
           isVisible={showQuickAccess && !showFavoritesOnly && !searchTerm}
           onClose={() => setShowQuickAccess(false)}
         />
 
-        <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+        <section className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-            <h3 className="flex items-center gap-2 font-semibold text-gray-900">
+            <h2 className="flex items-center gap-2 font-semibold text-gray-900">
               <Stethoscope className="h-5 w-5 text-blue-600" />
               Specialty Color Legend
-            </h3>
+            </h2>
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -431,7 +473,7 @@ export default function EmergencyReference() {
               ))}
             </div>
           </div>
-        </div>
+        </section>
 
         <VirtualizedConditionList
           conditions={filteredConditions}
@@ -474,7 +516,7 @@ export default function EmergencyReference() {
           recentSearches={recentSearches}
           onImportData={handleDataImport}
         />
-      </div>
+      </main>
     </div>
   )
 }
