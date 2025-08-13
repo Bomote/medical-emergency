@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Search, Stethoscope, Activity, Clock, StickyNote, Star } from "lucide-react"
 import DosageCalculator from "@/components/DosageCalculator"
 import ClinicalDecisionSupport from "@/components/ClinicalDecisionSupport"
@@ -93,8 +93,11 @@ export default function EmergencyReference() {
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [showQuickAccess, setShowQuickAccess] = useState(true)
+  const [isClient, setIsClient] = useState(false)
 
-  useMemo(() => {
+  useEffect(() => {
+    setIsClient(true)
+
     const savedNotes = localStorage.getItem("emergency-reference-notes")
     const savedFavorites = localStorage.getItem("emergency-reference-favorites")
     const savedRecentSearches = localStorage.getItem("emergency-reference-recent-searches")
@@ -123,6 +126,24 @@ export default function EmergencyReference() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("emergency-reference-notes", JSON.stringify(notes))
+    }
+  }, [notes, isClient])
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("emergency-reference-favorites", JSON.stringify(Array.from(favorites)))
+    }
+  }, [favorites, isClient])
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem("emergency-reference-recent-searches", JSON.stringify(recentSearches))
+    }
+  }, [recentSearches, isClient])
 
   const handleSearch = (term: string) => {
     setSearchTerm(term)
@@ -192,13 +213,14 @@ export default function EmergencyReference() {
   const filteredConditions = useMemo(() => {
     const cacheKey = `${searchTerm}-${selectedSpecialty}-${selectedAgeGroup}-${selectedSeverity}-${showFavoritesOnly}-${Array.from(favorites).join(",")}`
 
-    // Check cache first
-    const cachedResult = localStorage.getItem(`search-cache-${cacheKey}`)
-    if (cachedResult) {
-      try {
-        return JSON.parse(cachedResult) as EmergencyCondition[]
-      } catch (error) {
-        console.error("Error parsing cached search result:", error)
+    if (isClient) {
+      const cachedResult = localStorage.getItem(`search-cache-${cacheKey}`)
+      if (cachedResult) {
+        try {
+          return JSON.parse(cachedResult) as EmergencyCondition[]
+        } catch (error) {
+          console.error("Error parsing cached search result:", error)
+        }
       }
     }
 
@@ -231,16 +253,16 @@ export default function EmergencyReference() {
       return matchesSearch && matchesSpecialty && matchesAgeGroup && matchesSeverity && matchesFavorites
     })
 
-    // Cache the result with size limit
-    try {
-      const cacheKeys = Object.keys(localStorage).filter((key) => key.startsWith("search-cache-"))
-      if (cacheKeys.length >= 50) {
-        // Remove oldest cache entries
-        cacheKeys.slice(0, 10).forEach((key) => localStorage.removeItem(key))
+    if (isClient) {
+      try {
+        const cacheKeys = Object.keys(localStorage).filter((key) => key.startsWith("search-cache-"))
+        if (cacheKeys.length >= 50) {
+          cacheKeys.slice(0, 10).forEach((key) => localStorage.removeItem(key))
+        }
+        localStorage.setItem(`search-cache-${cacheKey}`, JSON.stringify(result))
+      } catch (error) {
+        console.error("Error caching search result:", error)
       }
-      localStorage.setItem(`search-cache-${cacheKey}`, JSON.stringify(result))
-    } catch (error) {
-      console.error("Error caching search result:", error)
     }
 
     return result
@@ -253,6 +275,7 @@ export default function EmergencyReference() {
     showFavoritesOnly,
     favorites,
     emergencyConditions,
+    isClient,
   ])
 
   const mostCriticalConditions = useMemo(() => {
