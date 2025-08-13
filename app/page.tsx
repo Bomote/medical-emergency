@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import emergencyConditionsData from "@/data/emergencyConditions.json"
 import DosageCalculator from "@/components/DosageCalculator"
+import ClinicalDecisionSupport from "@/components/ClinicalDecisionSupport"
 
 interface Treatment {
   drugName: string
@@ -95,6 +96,7 @@ export default function EmergencyReference() {
   const [expandedNotes, setExpandedNotes] = useState<Record<number, boolean>>({})
   const [notesSaving, setNotesSaving] = useState<Record<number, boolean>>({})
   const [calculatorOpen, setCalculatorOpen] = useState<number | null>(null)
+  const [clinicalSupportOpen, setClinicalSupportOpen] = useState<number | null>(null)
 
   useEffect(() => {
     const savedNotes = localStorage.getItem("emergency-reference-notes")
@@ -131,6 +133,14 @@ export default function EmergencyReference() {
 
   const closeCalculator = () => {
     setCalculatorOpen(null)
+  }
+
+  const openClinicalSupport = (conditionId: number) => {
+    setClinicalSupportOpen(conditionId)
+  }
+
+  const closeClinicalSupport = () => {
+    setClinicalSupportOpen(null)
   }
 
   const filteredConditions = useMemo(() => {
@@ -220,6 +230,14 @@ export default function EmergencyReference() {
           condition={emergencyConditions.find((c) => c.id === calculatorOpen)!}
           isOpen={calculatorOpen !== null}
           onClose={closeCalculator}
+        />
+      )}
+
+      {clinicalSupportOpen && (
+        <ClinicalDecisionSupport
+          condition={emergencyConditions.find((c) => c.id === clinicalSupportOpen)!}
+          isOpen={clinicalSupportOpen !== null}
+          onClose={closeClinicalSupport}
         />
       )}
 
@@ -344,6 +362,13 @@ export default function EmergencyReference() {
                     >
                       <Calculator className="h-3 w-3" />
                       Calculator
+                    </button>
+                    <button
+                      onClick={() => openClinicalSupport(condition.id)}
+                      className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <Activity className="h-3 w-3" />
+                      Clinical Tools
                     </button>
                     <button
                       onClick={() => toggleNotes(condition.id)}
